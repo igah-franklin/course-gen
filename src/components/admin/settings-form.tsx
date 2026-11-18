@@ -16,6 +16,7 @@ export type AdminSettings = {
   certificates: { platform_name: string; signatory_name: string; signatory_title: string; accent_color: string };
   completion: { require_final_assessment: boolean; default_passing_score: number };
   ai: { model: string; effort: "low" | "medium" | "high" | "xhigh" | "max"; max_lessons_per_course: number; image_generation: boolean };
+  payments: { platform_fee_percent: number };
 };
 
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
@@ -38,11 +39,13 @@ export function AdminSettingsForm({
   models,
   envFallback,
   imageProviderConfigured,
+  paystackConfigured,
 }: {
   initial: AdminSettings;
   models: { id: string; label: string }[];
   envFallback: { whatsapp: boolean; telegram: boolean };
   imageProviderConfigured: boolean;
+  paystackConfigured: boolean;
 }) {
   const [s, setS] = useState(initial);
   const [pending, start] = useTransition();
@@ -136,6 +139,32 @@ export function AdminSettingsForm({
             <span className="text-sm text-muted-foreground">%</span>
           </div>
         </div>
+      </Section>
+
+      <Section
+        title="Course sales"
+        description="Learners pay through Paystack into the platform account. The fee is kept by the platform; the rest is recorded as creator earnings for payout."
+      >
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm">Platform fee per sale</span>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={90}
+              step={0.5}
+              className="w-20"
+              value={s.payments.platform_fee_percent}
+              onChange={(e) => set("payments", { platform_fee_percent: Number(e.target.value) })}
+            />
+            <span className="text-sm text-muted-foreground">%</span>
+          </div>
+        </div>
+        {!paystackConfigured && (
+          <p className="rounded-lg bg-tile-butter px-3 py-2 text-xs">
+            Paystack isn&apos;t configured — set PAYSTACK_SECRET_KEY to let creators sell paid courses.
+          </p>
+        )}
       </Section>
 
       <Section title="AI provider" description="Model and generation limits. API keys are configured as server environment variables and never shown here.">

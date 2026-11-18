@@ -47,37 +47,42 @@ export default async function MyCoursesPage({ searchParams }: PageProps<"/dashbo
         title="My Courses"
         description={`${total} course${total === 1 ? "" : "s"}`}
         actions={
-          <Link href="/dashboard/courses/new" className={cn(buttonVariants({ size: "lg" }), "px-4")}>
+          <Link href="/dashboard/courses/new" className={cn(buttonVariants({ size: "lg" }), "h-11 px-5 text-[15px]")}>
             <PlusCircle /> Create a Course
           </Link>
         }
       />
 
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.key}
-              href={href({ filter: f.key })}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-sm transition-colors",
-                filter === f.key ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-muted",
-              )}
-            >
-              {f.label}
-            </Link>
-          ))}
-        </div>
-        <form action="/dashboard/courses" className="relative w-full md:w-72">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="mb-8 flex flex-col-reverse gap-4 border-b md:flex-row md:items-end md:justify-between">
+        <nav className="-mb-px flex gap-6 overflow-x-auto" aria-label="Filter courses">
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            return (
+              <Link
+                key={f.key}
+                href={href({ filter: f.key })}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "shrink-0 border-b-2 pb-3 text-[15px] whitespace-nowrap transition-colors",
+                  active ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {f.label}
+                {active ? <span className="ml-1 tabular-nums">({String(total).padStart(2, "0")})</span> : null}
+              </Link>
+            );
+          })}
+        </nav>
+        <form action="/dashboard/courses" className="relative w-full pb-3 md:w-72">
+          <Search className="pointer-events-none absolute top-[calc(50%-6px)] left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
           {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
-          <Input name="q" defaultValue={q} placeholder="Search courses…" className="h-9 pl-9" aria-label="Search courses" />
+          <Input name="q" defaultValue={q} placeholder="Search courses…" className="h-11 rounded-2xl bg-card pl-10" aria-label="Search courses" />
         </form>
       </div>
 
       {courses.length ? (
         <>
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {courses.map((c) => (
               <CourseCard key={c.id} course={c} now={now} />
             ))}
@@ -87,7 +92,7 @@ export default async function MyCoursesPage({ searchParams }: PageProps<"/dashbo
               <Link
                 aria-disabled={page <= 1}
                 href={href({ page: page - 1 })}
-                className={cn(buttonVariants({ variant: "outline" }), page <= 1 && "pointer-events-none opacity-50")}
+                className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full", page <= 1 && "pointer-events-none opacity-50")}
               >
                 <ChevronLeft /> Previous
               </Link>
@@ -97,7 +102,7 @@ export default async function MyCoursesPage({ searchParams }: PageProps<"/dashbo
               <Link
                 aria-disabled={page >= pages}
                 href={href({ page: page + 1 })}
-                className={cn(buttonVariants({ variant: "outline" }), page >= pages && "pointer-events-none opacity-50")}
+                className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full", page >= pages && "pointer-events-none opacity-50")}
               >
                 Next <ChevronRight />
               </Link>

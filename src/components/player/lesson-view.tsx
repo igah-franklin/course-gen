@@ -1,3 +1,4 @@
+import type { CourseSourceType } from "@/lib/sources/labels";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -32,8 +33,10 @@ type Props = {
   };
   moduleLabel: string;
   illustrations: IllustrationRow[];
-  videoId: string;
+  videoId: string | null;
   hasTimestamps: boolean;
+  /** Non-YouTube sources: how to point back at the original. */
+  source?: { kind: CourseSourceType; title: string | null; url: string | null };
 };
 
 function SectionTitle({ icon: Icon, children, id }: { icon: typeof Target; children: React.ReactNode; id?: string }) {
@@ -47,10 +50,10 @@ function SectionTitle({ icon: Icon, children, id }: { icon: typeof Target; child
   );
 }
 
-function SourceBadge({ source }: { source: "original" | "supplementary" }) {
+function SourceBadge({ source, fromBrief = false }: { source: "original" | "supplementary"; fromBrief?: boolean }) {
   return source === "original" ? (
     <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
-      <PlayCircle className="size-3" /> From the video
+      <PlayCircle className="size-3" /> {fromBrief ? "Core content" : "From the source"}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
@@ -72,7 +75,9 @@ function TimestampLink({ videoId, seconds }: { videoId: string; seconds: number 
   );
 }
 
-export function LessonView({ lesson, moduleLabel, illustrations, videoId, hasTimestamps }: Props) {
+export function LessonView({ lesson, moduleLabel, illustrations, videoId: rawVideoId, hasTimestamps: rawHasTimestamps, source }: Props) {
+  const videoId = rawVideoId ?? "";
+  const hasTimestamps = rawHasTimestamps && Boolean(rawVideoId);
   const c = lesson.content ?? {};
   const start = lesson.original_timestamp_start;
   const end = lesson.original_timestamp_end;
@@ -231,7 +236,7 @@ export function LessonView({ lesson, moduleLabel, illustrations, videoId, hasTim
           </SectionTitle>
           <div className="space-y-6">
             {illustrations.map((ill, i) => (
-              <IllustrationCard key={ill.id} ill={ill} videoId={videoId} index={i} />
+              <IllustrationCard key={ill.id} ill={ill} videoId={rawVideoId} index={i} />
             ))}
           </div>
         </section>
@@ -266,7 +271,7 @@ export function LessonView({ lesson, moduleLabel, illustrations, videoId, hasTim
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="font-semibold">{e.title}</h3>
                   <div className="flex items-center gap-2">
-                    <SourceBadge source={e.source} />
+                    <SourceBadge source={e.source} fromBrief={source?.kind === "prompt"} />
                     {hasTimestamps && e.timestamp_seconds != null && <TimestampLink videoId={videoId} seconds={e.timestamp_seconds} />}
                   </div>
                 </div>
@@ -279,7 +284,7 @@ export function LessonView({ lesson, moduleLabel, illustrations, videoId, hasTim
                   <h3 className="font-semibold">{e.title}</h3>
                   <div className="flex items-center gap-2">
                     <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{e.language}</span>
-                    <SourceBadge source={e.source} />
+                    <SourceBadge source={e.source} fromBrief={source?.kind === "prompt"} />
                   </div>
                 </div>
                 <pre className="overflow-x-auto bg-[oklch(0.2_0.02_265)] p-4 font-mono text-[13px] leading-6 text-[oklch(0.93_0.01_265)]">
@@ -337,25 +342,42 @@ export function LessonView({ lesson, moduleLabel, illustrations, videoId, hasTim
         </section>
       )}
 
-      {/* I. Original video reference */}
-      <section className="flex flex-col items-start gap-4 rounded-2xl border bg-card p-6 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-semibold">Original video reference</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {hasTimestamps && start != null
-              ? `This lesson covers ${formatTimestamp(start)}${end ? `–${formatTimestamp(end)}` : ""} of the original video.`
-              : "Open the original video for the full visual context."}
-          </p>
-        </div>
-        <a
-          href={timestampUrl(videoId, hasTimestamps ? start : 0)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#FF0000] px-4 text-sm font-medium text-white shadow-sm transition-all hover:brightness-110"
-        >
-          <PlayCircle className="size-4" /> Watch This Part of the Original Video
-        </a>
-      </section>
+      {/* I. Original source reference */}
+      {rawVideoId ? (
+        <section className="flex flex-col items-start gap-4 rounded-3xl border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-medium">Original video reference</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {hasTimestamps && start != null
+                ? `This lesson covers ${formatTimestamp(start)}${end ? `–${formatTimestamp(end)}` : ""} of the original video.`
+                : "Open the original video for the full visual context."}
+            </p>
+          </div>
+          <a
+            href={timestampUrl(videoId, hasTimestamps ? start : 0)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[#FF0000] px-4 text-sm font-medium text-white shadow-sm transition-all hover:brightness-110"
+          >
+            <PlayCircle className="size-4" /> Watch This Part of the Original Video
+          </a>
+        </section>
+      ) : source?.kind === "article" && source.url ? (
+        <section className="flex flex-col items-start gap-4 rounded-3xl border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-medium">Original article</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{source.title ?? "Read the source article for full context."}</p>
+          </div>
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-medium text-ink-foreground transition-all hover:bg-ink/85"
+          >
+            Read the Original Article
+          </a>
+        </section>
+      ) : null}
     </article>
   );
 }

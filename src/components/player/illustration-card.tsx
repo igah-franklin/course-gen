@@ -36,7 +36,7 @@ const TYPE_LABEL: Record<string, string> = {
   image: "Screenshot",
 };
 
-export function IllustrationCard({ ill, videoId, index }: { ill: IllustrationRow; videoId: string; index: number }) {
+export function IllustrationCard({ ill, videoId, index }: { ill: IllustrationRow; videoId: string | null; index: number }) {
   const m = ill.metadata ?? {};
   const imgSrc = ill.signed_url ?? ill.image_url;
   return (
@@ -48,7 +48,7 @@ export function IllustrationCard({ ill, videoId, index }: { ill: IllustrationRow
             Figure {index + 1} · {TYPE_LABEL[ill.image_type] ?? "Illustration"}
           </span>
         </div>
-        {ill.timestamp_seconds != null && (
+        {videoId && ill.timestamp_seconds != null && (
           <a
             href={timestampUrl(videoId, ill.timestamp_seconds)}
             target="_blank"

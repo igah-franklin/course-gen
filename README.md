@@ -39,6 +39,12 @@ update public.profiles set role = 'admin' where email = 'you@example.com';
 
 Recommended: `SUPADATA_API_KEY` (captions and transcription) and `YOUTUBE_API_KEY` (duration, description, caption availability). If a key is missing, the UI shows what is unavailable and why; it never fakes data. See [.env.example](.env.example) for everything.
 
+Paid courses: `PAYSTACK_SECRET_KEY` (`sk_test_…` / `sk_live_…`). In the Paystack dashboard (Settings → API Keys & Webhooks) set the webhook URL to `<NEXT_PUBLIC_SITE_URL>/api/payments/paystack/webhook`. The platform collects payments; each sale records the platform fee (Admin → Settings) and the creator's earnings, which admins settle from Admin → Payments.
+
+### Course sources
+
+Courses can be created from a YouTube link, an uploaded video/audio file (transcribed via Supadata), a document (PDF, DOCX, TXT, Markdown — text-based PDFs only) or a public article link. Documents and articles are converted to text when the course is created and analysed in full.
+
 ### Supabase setup
 
 1. **Auth → URL configuration:** set Site URL to `NEXT_PUBLIC_SITE_URL` and add `<site>/auth/callback` to the redirect URLs.
@@ -107,7 +113,11 @@ The app exposes a remote MCP server at **`<NEXT_PUBLIC_SITE_URL>/api/mcp`**. It 
 
 After two rejected attempts, the submission is saved and flagged for review instead. Screenshots are sent to the assistant as images for analysis. Progress is checkpointed after every step, so a user can resume in any new chat, and the web progress page updates live.
 
-**Tools:** `create_course`, `list_courses`, `get_next_step`, `submit_chunk_analysis`, `submit_frame_analysis`, `submit_course_overview`, `submit_curriculum`, `submit_lesson`, `submit_illustrations`, `submit_quiz`, `submit_quality_review`. There is also a `create_course` prompt.
+**Create tools** (one per method, all also available in the web app): `create_course` (YouTube, optional pasted `transcript_text`), `create_course_from_prompt` (a written brief — no material), `create_course_from_article` (public URL), `create_course_from_document` (public PDF/DOCX/TXT/MD link, or the full text of a file attached in chat), `create_course_from_media` (public audio/video link, transcribed). Each takes `writer: "me"` (default — the assistant writes the course step by step) or `"platform"` (the built-in AI generates it in the background; poll with `get_course_status`).
+
+**Other tools:** `list_courses`, `get_course_status`, `get_next_step`, `submit_chunk_analysis`, `submit_frame_analysis`, `submit_course_overview`, `submit_curriculum`, `submit_lesson`, `submit_illustrations`, `submit_quiz`, `submit_quality_review`. Prompts: `create_course`, `course_from_prompt`, `course_from_article`, `course_from_document`, `course_from_media`.
+
+**Prompt-based courses** reuse the whole pipeline: the brief is stored as the source, the first step plans the complete teaching-point syllabus from it, and every later stage (overview, curriculum coverage, lessons, quizzes, QA) runs unchanged — with accuracy rules (no invented citations or statistics) in place of source-fidelity rules. The finished course carries a "review for accuracy" note.
 
 **Trade-offs vs. the built-in engine:**
 
@@ -121,7 +131,7 @@ After two rejected attempts, the submission is saved and flagged for review inst
 - AI grading of written quiz answers (without a key, grading falls back to keyword matching).
 - The "Regenerate lesson / illustrations" buttons in the web app.
 
-`create_course` from chat needs `SUPADATA_API_KEY` for transcripts. Without it, users prepare the course on the web with an uploaded transcript.
+`create_course` (without `transcript_text`) and `create_course_from_media` need `SUPADATA_API_KEY`. Prompt, article and document creation need no extra keys.
 
 ## Security model
 

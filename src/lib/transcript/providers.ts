@@ -11,7 +11,7 @@ import type { TranscriptSegment } from "./parse";
  *  - "media_upload":    speech-to-text of a media file the user uploaded and owns
  *  - "manual":          a transcript/caption file the user supplied (handled before the job starts)
  */
-export type TranscriptSource = "captions" | "ai_transcription" | "media_upload" | "manual";
+export type TranscriptSource = "captions" | "ai_transcription" | "media_upload" | "manual" | "document" | "article" | "prompt";
 
 export type TranscriptResult =
   | { status: "done"; segments: TranscriptSegment[]; lang: string | null }
@@ -71,8 +71,8 @@ export function transcriptProviderConfigured() {
 }
 
 export async function requestTranscript(opts: {
-  source: Exclude<TranscriptSource, "manual">;
-  videoUrl: string;
+  source: Exclude<TranscriptSource, "manual" | "document" | "article" | "prompt">;
+  videoUrl?: string;
   mediaUrl?: string;
   lang?: string;
 }): Promise<TranscriptResult> {
@@ -83,7 +83,9 @@ export async function requestTranscript(opts: {
     };
   }
   const url = new URL(`${SUPADATA}/transcript`);
-  url.searchParams.set("url", opts.source === "media_upload" && opts.mediaUrl ? opts.mediaUrl : opts.videoUrl);
+  const target = opts.source === "media_upload" && opts.mediaUrl ? opts.mediaUrl : opts.videoUrl;
+  if (!target) return { status: "unavailable", reason: "No media to transcribe." };
+  url.searchParams.set("url", target);
   url.searchParams.set("text", "false");
   url.searchParams.set("mode", opts.source === "captions" ? "native" : "generate");
   if (opts.lang) url.searchParams.set("lang", opts.lang);

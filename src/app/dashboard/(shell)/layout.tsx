@@ -11,16 +11,16 @@ import { redirect } from "next/navigation";
 
 export default function DashboardShellLayout({ children }: LayoutProps<"/dashboard">) {
   return (
-    <div className="min-h-screen bg-muted/30 lg:grid lg:grid-cols-[260px_1fr]">
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[280px_1fr]">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen flex-col border-r bg-sidebar px-3 py-4 lg:flex">
-        <div className="px-2 pb-6">
+      <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto border-r bg-sidebar px-5 py-7 lg:flex">
+        <div className="px-3 pb-9">
           <Logo href="/dashboard" />
         </div>
         <Suspense fallback={<SidebarNavFallback />}>
           <SidebarNavWithRole />
         </Suspense>
-        <div className="mt-auto space-y-3">
+        <div className="mt-auto space-y-4 pt-8">
           <Suspense fallback={null}>
             <SidebarCommunity />
           </Suspense>
@@ -43,7 +43,7 @@ export default function DashboardShellLayout({ children }: LayoutProps<"/dashboa
             </Suspense>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</main>
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-12 lg:py-10">{children}</main>
       </div>
     </div>
   );

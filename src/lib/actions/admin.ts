@@ -5,7 +5,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AiSettings, CertificateSettings, CommunitySettings, CompletionSettings } from "@/lib/settings";
+import { AiSettings, CertificateSettings, CommunitySettings, CompletionSettings, PaymentSettings } from "@/lib/settings";
 import { SUPPORTED_MODELS } from "@/lib/ai/pricing";
 import { kickJob } from "@/lib/jobs/runner";
 
@@ -86,6 +86,7 @@ const SettingsInput = z.object({
   certificates: CertificateSettings,
   completion: CompletionSettings,
   ai: AiSettings.extend({ model: z.string().refine((m) => SUPPORTED_MODELS.includes(m), "Unsupported model") }),
+  payments: z.object({ platform_fee_percent: z.number().min(0, "Fee must be 0–90%").max(90, "Fee must be 0–90%") }),
 });
 
 export async function saveSettingsAction(input: z.input<typeof SettingsInput>): Promise<Result> {
@@ -112,6 +113,7 @@ export async function saveSettingsAction(input: z.input<typeof SettingsInput>): 
     { key: "certificates", value: parsed.data.certificates },
     { key: "completion", value: parsed.data.completion },
     { key: "ai", value: parsed.data.ai },
+    { key: "payments", value: PaymentSettings.parse(parsed.data.payments) },
   ].map((r) => ({ ...r, updated_by: user.id }));
   const { error } = await db.from("platform_settings").upsert(rows, { onConflict: "key" });
   if (error) return { ok: false, error: error.message };

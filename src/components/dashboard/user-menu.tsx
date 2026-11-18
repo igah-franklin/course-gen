@@ -34,10 +34,10 @@ export function UserMenu({ user, compact = false }: { user: MenuUser; compact?: 
       <form ref={formRef} action="/auth/signout" method="post" className="hidden" />
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="flex w-full items-center gap-3 rounded-lg p-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex w-full items-center gap-3 rounded-xl p-2 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Account menu"
         >
-          <Avatar className="size-8">
+          <Avatar className="size-9">
             {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
             <AvatarFallback className="bg-accent text-xs font-medium text-primary">{initials(user.fullName)}</AvatarFallback>
           </Avatar>

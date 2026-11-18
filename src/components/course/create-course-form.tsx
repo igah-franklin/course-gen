@@ -13,6 +13,7 @@ import {
   Clock,
   FileAudio,
   FileText,
+  Globe,
   ImagePlus,
   Info,
   Link2,
@@ -21,18 +22,17 @@ import {
   Plug,
   Sparkles,
   Trash2,
-  Upload,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { YouTubeIcon } from "@/components/brand/brand-icons";
-import { createClient } from "@/lib/supabase/client";
 import { formatDuration, formatTimestamp } from "@/lib/youtube/url";
 import { createCourseAction, previewVideoAction, type VideoPreview } from "@/lib/actions/courses";
 import { cn } from "@/lib/utils";
+import { EnginePicker, FileDrop, uploadFile, type Capabilities } from "./create-course-shared";
+import { SourceCourseForm, type OtherSource } from "./source-course-form";
 
 type Source = "captions" | "ai_transcription" | "manual" | "media_upload";
 type Frame = { path: string; previewUrl: string; timestamp: string; caption: string; name: string };
@@ -47,16 +47,7 @@ function parseTs(v: string): number | null {
   return parts.reduce((acc, n) => acc * 60 + n, 0);
 }
 
-async function uploadFile(userId: string, file: File, folder: string) {
-  const supabase = createClient();
-  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
-  const path = `${userId}/${folder}/${crypto.randomUUID()}-${safe}`;
-  const { error } = await supabase.storage.from("uploads").upload(path, file, { contentType: file.type || undefined, upsert: false });
-  if (error) throw new Error(error.message);
-  return path;
-}
-
-export function CreateCourseForm({ userId, initialUrl = "" }: { userId: string; initialUrl?: string }) {
+function YouTubeCourseForm({ userId, initialUrl = "" }: { userId: string; initialUrl?: string }) {
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl);
   const [preview, setPreview] = useState<VideoPreview | null>(null);
@@ -312,62 +303,7 @@ export function CreateCourseForm({ userId, initialUrl = "" }: { userId: string; 
             </div>
           </section>
 
-          {/* Engine */}
-          <section className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">★</span>
-              Who should write the course?
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Generation engine">
-              {[
-                {
-                  key: "server" as const,
-                  title: "Our AI, in the background",
-                  body: "Paste and walk away. We generate the whole course and notify you here when it's ready.",
-                  icon: Sparkles,
-                  disabled: preview.capabilities.ai ? undefined : "Built-in AI isn't configured on this server",
-                },
-                {
-                  key: "assistant" as const,
-                  title: "Your Claude or ChatGPT",
-                  body: "Uses your own subscription through the connector — no API keys. Your assistant writes each lesson in a chat.",
-                  icon: Plug,
-                },
-              ].map((o) => {
-                const selected = engine === o.key;
-                return (
-                  <button
-                    key={o.key}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={Boolean(o.disabled)}
-                    onClick={() => setEngine(o.key)}
-                    className={cn(
-                      "flex gap-3 rounded-xl border p-4 text-left transition-all",
-                      selected ? "border-primary bg-accent/50 ring-1 ring-primary" : "hover:border-primary/40",
-                      o.disabled && "cursor-not-allowed opacity-50 hover:border-border",
-                    )}
-                  >
-                    <o.icon className={cn("mt-0.5 size-5 shrink-0", selected ? "text-primary" : "text-muted-foreground")} />
-                    <span>
-                      <span className="block text-sm font-medium">{o.title}</span>
-                      <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{o.disabled ?? o.body}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {engine === "assistant" && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Haven&apos;t connected yet?{" "}
-                <Link href="/dashboard/connect" className="font-medium text-primary hover:underline">
-                  Set up the connector
-                </Link>{" "}
-                — it takes a minute. You can also start courses directly from the chat.
-              </p>
-            )}
-          </section>
+          <EnginePicker engine={engine} onChange={setEngine} aiAvailable={preview.capabilities.ai} />
 
           {/* Step 3: transcript source */}
           <section className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
@@ -523,71 +459,62 @@ export function CreateCourseForm({ userId, initialUrl = "" }: { userId: string; 
   );
 }
 
-function FileDrop({
-  accept,
-  label,
-  hint,
-  file,
-  busy,
-  onFile,
-  onClear,
+const SOURCE_TABS: { key: "youtube" | OtherSource; label: string; body: string; icon: typeof FileText }[] = [
+  { key: "youtube", label: "YouTube video", body: "Paste a link", icon: Link2 },
+  { key: "video_upload", label: "Video / audio file", body: "Upload a recording", icon: FileAudio },
+  { key: "document", label: "Document", body: "PDF, DOCX, TXT", icon: FileText },
+  { key: "article", label: "Article link", body: "Blog post or web page", icon: Globe },
+  { key: "prompt", label: "From a prompt", body: "Describe a course", icon: Sparkles },
+];
+
+export function CreateCourseForm({
+  userId,
+  initialUrl = "",
+  capabilities,
 }: {
-  accept: string;
-  label: string;
-  hint: string;
-  file: { name: string } | null;
-  busy: boolean;
-  onFile: (f: File) => void;
-  onClear: () => void;
+  userId: string;
+  initialUrl?: string;
+  capabilities: Capabilities;
 }) {
-  const ref = useRef<HTMLInputElement>(null);
-  const [drag, setDrag] = useState(false);
-  if (file) {
-    return (
-      <div className="mt-4 flex items-center gap-3 rounded-xl border bg-muted/40 px-4 py-3 text-sm">
-        <CheckCircle2 className="size-4 text-success" />
-        <span className="min-w-0 flex-1 truncate">{file.name}</span>
-        <button onClick={onClear} className="text-muted-foreground hover:text-foreground" aria-label="Remove file">
-          <X className="size-4" />
-        </button>
-      </div>
-    );
-  }
+  const [kind, setKind] = useState<"youtube" | OtherSource>("youtube");
   return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDrag(true);
-      }}
-      onDragLeave={() => setDrag(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDrag(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) onFile(f);
-      }}
-      className={cn(
-        "mt-4 flex flex-col items-center rounded-xl border border-dashed px-6 py-8 text-center transition-colors",
-        drag ? "border-primary bg-accent/40" : "bg-muted/20",
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" role="tablist" aria-label="Course source">
+        {SOURCE_TABS.map((t) => {
+          const active = kind === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setKind(t.key)}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-all",
+                active ? "border-ink bg-ink text-ink-foreground shadow-sm" : "bg-card hover:border-foreground/25",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                  active ? "bg-ink-foreground/10" : "bg-muted",
+                )}
+              >
+                <t.icon className="size-[18px]" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{t.label}</span>
+                <span className={cn("block truncate text-xs", active ? "text-ink-foreground/65" : "text-muted-foreground")}>{t.body}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {kind === "youtube" ? (
+        <YouTubeCourseForm userId={userId} initialUrl={initialUrl} />
+      ) : (
+        <SourceCourseForm key={kind} userId={userId} kind={kind} capabilities={capabilities} />
       )}
-    >
-      {busy ? <Loader2 className="size-6 animate-spin text-primary" /> : <Upload className="size-6 text-muted-foreground" />}
-      <p className="mt-2 text-sm font-medium">{label}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-      <Button variant="outline" size="sm" className="mt-3" disabled={busy} onClick={() => ref.current?.click()}>
-        Choose file
-      </Button>
-      <input
-        ref={ref}
-        type="file"
-        accept={accept}
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onFile(f);
-          e.target.value = "";
-        }}
-      />
     </div>
   );
 }

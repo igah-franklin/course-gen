@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ export const NAV_ITEMS: Item[] = [
   { href: "/dashboard/courses/new", label: "Create a Course", icon: PlusCircle },
   { href: "/dashboard/explore", label: "Explore Courses", icon: Compass },
   { href: "/dashboard/connect", label: "Connect AI", icon: Plug },
+  { href: "/dashboard/earnings", label: "Earnings", icon: Wallet },
   { href: "/dashboard/certificates", label: "Certificates", icon: Award },
   { href: "/dashboard/community", label: "Community", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -43,7 +45,7 @@ export function SidebarNav({ isAdmin = false, onNavigate }: { isAdmin?: boolean;
   };
 
   return (
-    <nav className="space-y-0.5">
+    <nav className="space-y-1">
       {NAV_ITEMS.map((item) => {
         const active = isActive(item);
         return (
@@ -53,13 +55,16 @@ export function SidebarNav({ isAdmin = false, onNavigate }: { isAdmin?: boolean;
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "group flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-[15px] transition-colors",
               active
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
+                ? "bg-ink text-ink-foreground shadow-sm"
+                : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
             )}
           >
-            <item.icon className={cn("size-4", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+            <item.icon
+              strokeWidth={1.75}
+              className={cn("size-[18px]", active ? "text-ink-foreground" : "text-sidebar-foreground/70 group-hover:text-foreground")}
+            />
             {item.label}
           </Link>
         );
@@ -68,9 +73,9 @@ export function SidebarNav({ isAdmin = false, onNavigate }: { isAdmin?: boolean;
         <Link
           href="/admin"
           onClick={onNavigate}
-          className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
+          className="mt-2 flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-[15px] text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-foreground"
         >
-          <ShieldCheck className="size-4" /> Admin
+          <ShieldCheck strokeWidth={1.75} className="size-[18px]" /> Admin
         </Link>
       )}
     </nav>
@@ -80,14 +85,14 @@ export function SidebarNav({ isAdmin = false, onNavigate }: { isAdmin?: boolean;
 /** Static nav (no active state) used as the Suspense fallback while the pathname resolves. */
 export function SidebarNavFallback() {
   return (
-    <nav className="space-y-0.5">
+    <nav className="space-y-1">
       {NAV_ITEMS.map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground"
+          className="flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-[15px] text-sidebar-foreground/80"
         >
-          <item.icon className="size-4" />
+          <item.icon strokeWidth={1.75} className="size-[18px]" />
           {item.label}
         </Link>
       ))}

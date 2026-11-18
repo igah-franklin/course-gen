@@ -21,7 +21,7 @@ import { getCachedCommunityLinks } from "@/lib/settings-cached";
 import { CourseCard } from "@/components/course/course-card";
 import { ActivityChart } from "@/components/dashboard/activity-chart";
 import { CommunityButtons } from "@/components/shared/community-buttons";
-import { EmptyState, PageHeader, SectionCard, StatCard, relativeTime } from "@/components/shared/ui-bits";
+import { EmptyState, FlowStep, PageHeader, SectionCard, StatCard, TONE_BG, relativeTime, type Tone } from "@/components/shared/ui-bits";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,7 @@ export default async function DashboardPage() {
   const achievements = [
     ...data.certificates.map((c) => ({
       key: `cert-${c.id}`,
+      tone: "butter" as Tone,
       icon: Award,
       title: "Certificate earned",
       body: c.course_title,
@@ -44,6 +45,7 @@ export default async function DashboardPage() {
     })),
     ...data.passedQuizzes.map((a) => ({
       key: `quiz-${a.id}`,
+      tone: "lilac" as Tone,
       icon: Trophy,
       title: a.quizzes?.kind === "final" ? "Final assessment passed" : "Quiz passed",
       body: `${a.quizzes?.title ?? "Quiz"} · ${Math.round(Number(a.score))}%`,
@@ -52,6 +54,7 @@ export default async function DashboardPage() {
     })),
     ...data.recentlyCompleted.map((c) => ({
       key: `course-${c.id}`,
+      tone: "mint" as Tone,
       icon: GraduationCap,
       title: "Course completed",
       body: c.title,
@@ -75,23 +78,23 @@ export default async function DashboardPage() {
         title={`Welcome back, ${firstName}`}
         description="Here's where you are in your learning journey."
         actions={
-          <Link href="/dashboard/courses/new" className={cn(buttonVariants({ size: "lg" }), "px-4")}>
+          <Link href="/dashboard/courses/new" className={cn(buttonVariants({ size: "lg" }), "h-11 px-5 text-[15px]")}>
             <PlusCircle /> Create New Course
           </Link>
         }
       />
 
       {!user.emailVerified && (
-        <div className="mb-6 rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm">
+        <div className="mb-6 rounded-2xl bg-tile-butter px-5 py-3.5 text-sm">
           Please verify your email address — check your inbox for the confirmation link.
         </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Courses" value={data.stats.totalCourses} icon={BookOpen} />
-        <StatCard label="Courses Completed" value={data.stats.completed} icon={CheckCircle2} />
-        <StatCard label="Courses In Progress" value={data.stats.inProgress} icon={PlayCircle} />
-        <StatCard label="Learning Hours" value={data.stats.learningHours} icon={Clock} hint="Time spent reading lessons" />
+        <StatCard tone="sky" label="Total Courses" value={data.stats.totalCourses} icon={BookOpen} />
+        <StatCard tone="mint" label="Courses Completed" value={data.stats.completed} icon={CheckCircle2} />
+        <StatCard tone="lilac" label="Courses In Progress" value={data.stats.inProgress} icon={PlayCircle} />
+        <StatCard tone="butter" label="Learning Hours" value={data.stats.learningHours} icon={Clock} hint="Time spent reading lessons" />
       </div>
 
       {data.processing.length > 0 && (
@@ -100,13 +103,15 @@ export default async function DashboardPage() {
             <Link
               key={c.id}
               href={`/dashboard/courses/${c.id}`}
-              className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm shadow-xs transition-colors hover:border-primary/40"
+              className="flex items-center gap-3 rounded-2xl bg-tile-lilac px-5 py-3.5 text-sm transition-all hover:brightness-[0.98]"
             >
-              <Loader2 className="size-4 animate-spin text-primary" />
+              <span className="flex size-8 items-center justify-center rounded-full bg-card/70">
+                <Loader2 className="size-4 animate-spin text-primary" />
+              </span>
               <span className="min-w-0 flex-1 truncate">
                 <span className="font-medium">Generating:</span> {c.title}
               </span>
-              <span className="text-xs text-muted-foreground">View progress →</span>
+              <span className="rounded-full bg-card/70 px-3 py-1 text-xs font-medium">View progress →</span>
             </Link>
           ))}
         </div>
@@ -115,21 +120,21 @@ export default async function DashboardPage() {
       {/* Quick actions */}
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { href: "/dashboard/courses/new", icon: Sparkles, label: "Create New Course", body: "Paste a YouTube URL" },
-          { href: "/dashboard/courses", icon: BookOpen, label: "Browse My Courses", body: "All your courses" },
-          { href: "/dashboard/certificates", icon: Award, label: "View Certificates", body: "Download & share" },
-          { href: "/dashboard/community", icon: Users, label: "Join Learning Community", body: "WhatsApp & Telegram" },
+          { href: "/dashboard/courses/new", icon: Sparkles, label: "Create New Course", body: "Paste a YouTube URL", tone: "peach" as Tone },
+          { href: "/dashboard/courses", icon: BookOpen, label: "Browse My Courses", body: "All your courses", tone: "sky" as Tone },
+          { href: "/dashboard/certificates", icon: Award, label: "View Certificates", body: "Download & share", tone: "butter" as Tone },
+          { href: "/dashboard/community", icon: Users, label: "Join Learning Community", body: "WhatsApp & Telegram", tone: "mint" as Tone },
         ].map((a) => (
           <Link
             key={a.href}
             href={a.href}
-            className="group flex items-center gap-3 rounded-xl border bg-card p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+            className="group flex items-center gap-3.5 rounded-3xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-18px_oklch(0.3_0.03_40/0.35)]"
           >
-            <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-primary">
+            <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-2xl text-foreground/80", TONE_BG[a.tone])}>
               <a.icon className="size-5" />
             </span>
-            <span>
-              <span className="block text-sm font-medium">{a.label}</span>
+            <span className="min-w-0">
+              <span className="block text-[15px] font-medium">{a.label}</span>
               <span className="block text-xs text-muted-foreground">{a.body}</span>
             </span>
           </Link>
@@ -139,13 +144,13 @@ export default async function DashboardPage() {
       {/* Continue learning */}
       <div className="mt-10">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Continue Learning</h2>
-          <Link href="/dashboard/courses" className="text-sm text-primary hover:underline">
+          <h2 className="text-2xl font-medium">Continue Learning</h2>
+          <Link href="/dashboard/courses" className="rounded-full border bg-card px-4 py-1.5 text-sm transition-colors hover:bg-muted">
             View all
           </Link>
         </div>
         {data.continueLearning.length ? (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {data.continueLearning.map((c) => (
               <CourseCard key={c.id} course={c} now={now} />
             ))}
@@ -175,18 +180,20 @@ export default async function DashboardPage() {
 
         <SectionCard title="Recent Achievements">
           {achievements.length ? (
-            <ul className="space-y-3">
+            <ul className="space-y-2.5">
               {achievements.map((a) => (
                 <li key={a.key}>
-                  <Link href={a.href} className="flex items-start gap-3 rounded-lg p-1.5 transition-colors hover:bg-muted/60">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
-                      <a.icon className="size-4" />
+                  <Link
+                    href={a.href}
+                    className={cn("block rounded-2xl p-3.5 transition-all hover:brightness-[0.98]", TONE_BG[a.tone])}
+                  >
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <a.icon className="size-4" /> {a.title}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-foreground/60">{relativeTime(a.at, now)}</span>
                     </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">{a.title}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{a.body}</span>
-                      <span className="block text-[11px] text-muted-foreground">{relativeTime(a.at, now)}</span>
-                    </span>
+                    <span className="mt-2 block truncate rounded-xl bg-card/70 px-3 py-2 text-[13px]">{a.body}</span>
                   </Link>
                 </li>
               ))}
@@ -194,12 +201,11 @@ export default async function DashboardPage() {
           ) : (
             <div>
               <p className="text-sm text-muted-foreground">Your milestones will appear here.</p>
-              <ul className="mt-4 space-y-2.5">
-                {milestones.map((m) => (
-                  <li key={m.label} className="flex items-center gap-2.5 text-sm">
-                    <CheckCircle2 className={cn("size-4", m.done ? "text-primary" : "text-muted-foreground/40")} />
-                    <span className={m.done ? "" : "text-muted-foreground"}>{m.label}</span>
-                  </li>
+              <ul className="mt-3">
+                {milestones.map((m, i) => (
+                  <FlowStep key={m.label} done={m.done} last={i === milestones.length - 1} dashed dotLeft={0} dotTop={10}>
+                    <span className={cn("block py-2.5 pl-9 text-sm", m.done ? "font-medium" : "text-muted-foreground")}>{m.label}</span>
+                  </FlowStep>
                 ))}
               </ul>
             </div>
@@ -207,14 +213,18 @@ export default async function DashboardPage() {
         </SectionCard>
       </div>
 
-      <section className="mt-6 flex flex-col items-start justify-between gap-5 rounded-xl border bg-card p-6 shadow-xs md:flex-row md:items-center">
-        <div>
-          <h2 className="text-base font-semibold">Learn Better, Together.</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <section className="relative mt-6 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-3xl bg-ink p-7 text-ink-foreground md:flex-row md:items-center">
+        <span aria-hidden className="pointer-events-none absolute -top-16 right-1/3 size-48 rounded-full border border-ink-foreground/10" />
+        <span aria-hidden className="pointer-events-none absolute -bottom-20 left-10 size-40 rounded-full border border-ink-foreground/10" />
+        <div className="relative">
+          <h2 className="text-xl font-medium">
+            Learn better, together<span className="text-primary">.</span>
+          </h2>
+          <p className="mt-1 text-sm text-ink-foreground/70">
             Ask questions, share your progress, and get support from other learners.
           </p>
         </div>
-        <CommunityButtons links={links} />
+        <CommunityButtons links={links} className="relative" />
       </section>
     </div>
   );

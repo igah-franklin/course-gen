@@ -34,6 +34,7 @@ import {
   buildOverviewPrompt,
   buildQualityPrompt,
   buildQuizPrompt,
+  adaptPromptForCourse,
   isServerTask,
   planStage,
   runTask,
@@ -162,8 +163,9 @@ async function briefFor(ctx: Ctx, task: TaskRow): Promise<{ title: string; promp
   switch (kind) {
     case "analyze": {
       const index = Number(p.index);
+      const { data: src } = await ctx.db.from("courses").select("source_type").eq("id", ctx.job.course_id).single();
       return {
-        title: `Analyze transcript window ${index + 1} of ${p.total}`,
+        title: src?.source_type === "prompt" ? "Plan the course syllabus from the creator's brief" : `Analyze source window ${index + 1} of ${p.total}`,
         args: { chunk_index: index },
         prompt: await buildChunkPrompt(ctx, index),
       };
@@ -279,7 +281,8 @@ export async function nextStep(ctx: Ctx): Promise<NextStep> {
         continue;
       }
 
-      const brief = await briefFor(ctx, task);
+      const raw = await briefFor(ctx, task);
+      const brief = raw ? { ...raw, prompt: await adaptPromptForCourse(ctx, raw.prompt) } : null;
       if (!brief) {
         await ctx.db.from("job_tasks").update({ status: "skipped" }).eq("id", task.id);
         continue;

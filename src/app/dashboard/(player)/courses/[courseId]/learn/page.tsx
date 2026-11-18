@@ -16,6 +16,8 @@ import { QuizView, type QuizQuestion } from "@/components/player/quiz-view";
 import { CompletionScreen } from "@/components/player/completion-screen";
 import { AuthorTools } from "@/components/player/author-tools";
 import type { IllustrationRow } from "@/components/player/illustration-card";
+import { userHasCourseAccess } from "@/lib/data/marketplace";
+import { sourceTypeOf } from "@/lib/sources/labels";
 
 export const metadata: Metadata = { title: "Learn" };
 
@@ -49,6 +51,10 @@ async function Learn({ params, searchParams }: PageProps<"/dashboard/courses/[co
   const outline = await getCourseOutline(courseId, user.id);
   if (!outline) notFound();
   if (!["ready", "needs_review"].includes(outline.course.status)) redirect(`/dashboard/courses/${courseId}`);
+  // No access yet (shared course not enrolled / not purchased) → course page shows how to enroll.
+  if (!(await userHasCourseAccess(user.id, courseId, outline.course.user_id, user.role === "admin"))) {
+    redirect(`/dashboard/courses/${courseId}`);
+  }
 
   const playerOutline: PlayerOutline = {
     courseId,
@@ -215,8 +221,13 @@ async function Learn({ params, searchParams }: PageProps<"/dashboard/courses/[co
         }}
         moduleLabel={`Module ${modIndex + 1} · Lesson ${lessonIndex + 1} — ${mod?.title ?? ""}`}
         illustrations={illustrations}
-        videoId={outline.course.youtube_video_id}
+        videoId={outline.course.youtube_video_id ?? null}
         hasTimestamps={hasTimestamps}
+        source={{
+          kind: sourceTypeOf(outline.course.source_type),
+          title: outline.course.original_video_title ?? null,
+          url: outline.course.source_url ?? null,
+        }}
       />
     </PlayerShell>
   );

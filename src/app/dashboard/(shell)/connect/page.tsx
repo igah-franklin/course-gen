@@ -85,12 +85,39 @@ export default async function ConnectPage() {
 
       <SectionCard title="Prompts to use" className="mt-6">
         <div className="space-y-3">
-          <div>
-            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Sparkles className="size-3.5" /> Start a new course
-            </p>
-            <CopyField multiline value={`Use ${publicEnv.appName} to create a complete course from https://www.youtube.com/watch?v=VIDEO_ID — keep completing each task until the course is done.`} />
-          </div>
+          {[
+            {
+              label: "From a YouTube video",
+              value: `Use ${publicEnv.appName} to create a complete course from https://www.youtube.com/watch?v=VIDEO_ID — keep completing each task until the course is done.`,
+            },
+            {
+              label: "From a prompt (no material needed)",
+              value: `Use ${publicEnv.appName} to create a beginner course on TOPIC for AUDIENCE. It must cover: … Keep completing each task until the course is done.`,
+            },
+            {
+              label: "From a document (attach a PDF/DOCX to the chat, or give a link)",
+              value: `Use ${publicEnv.appName} to create a complete course from the document I've attached — pass its full text, then keep completing each task until the course is done.`,
+            },
+            {
+              label: "From an article",
+              value: `Use ${publicEnv.appName} to create a complete course from this article: https://… — keep completing each task until the course is done.`,
+            },
+            {
+              label: "From a recording (public audio/video link)",
+              value: `Use ${publicEnv.appName} to create a complete course from this recording: https://…/lecture.mp4 — keep completing each task until the course is done.`,
+            },
+            {
+              label: "Let the platform write it in the background",
+              value: `Use ${publicEnv.appName} to create a course on TOPIC with writer "platform", then tell me when it's ready.`,
+            },
+          ].map((p) => (
+            <div key={p.label}>
+              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Sparkles className="size-3.5" /> {p.label}
+              </p>
+              <CopyField multiline value={p.value} />
+            </div>
+          ))}
           <div>
             <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Sparkles className="size-3.5" /> Continue a course (e.g. in a new chat)
@@ -109,8 +136,8 @@ export default async function ConnectPage() {
       <SectionCard title="How it works" className="mt-6">
         <ul className="grid gap-3 text-sm sm:grid-cols-2">
           {[
-            "We fetch the video details and transcript on our side.",
-            "Your assistant analyses the transcript window by window and writes each lesson.",
+            "We fetch and read the source on our side — video transcript, document, article or recording — or start from your brief.",
+            "Your assistant analyses the source section by section (or plans the syllabus from your brief) and writes each lesson.",
             "Every submission is checked: lessons that skip teaching points are sent back to be fixed.",
             "Progress is saved after every step — say “continue” in any new chat to resume.",
           ].map((t) => (

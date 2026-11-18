@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { HeaderAuthActions } from "./auth-actions";
 
 export function SiteHeader() {
   return (
@@ -15,12 +14,7 @@ export function SiteHeader() {
           <Link href="/help" className="transition-colors hover:text-foreground">Help</Link>
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Link href="/login" className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "hidden sm:inline-flex")}>
-            Sign in
-          </Link>
-          <Link href="/signup" className={cn(buttonVariants({ size: "lg" }), "px-4")}>
-            Get started
-          </Link>
+          <HeaderAuthActions />
         </div>
       </div>
     </header>

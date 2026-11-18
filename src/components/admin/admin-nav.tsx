@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Award, BookOpen, Cpu, LayoutDashboard, Settings, Users } from "lucide-react";
+import { ArrowLeft, Award, BookOpen, Cpu, LayoutDashboard, Settings, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
   { href: "/admin/courses", label: "Courses", icon: BookOpen },
   { href: "/admin/jobs", label: "Generation jobs", icon: Cpu },
   { href: "/admin/certificates", label: "Certificates", icon: Award },
+  { href: "/admin/payments", label: "Payments", icon: Wallet },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

@@ -1,9 +1,9 @@
 /** Stage metadata shared by the server pipeline and the progress UI. */
 
 export const STAGE_LABELS = {
-  metadata: "Retrieving video information",
-  transcript: "Extracting transcript",
-  analyze: "Analyzing video content",
+  metadata: "Retrieving source information",
+  transcript: "Extracting content",
+  analyze: "Analyzing source content",
   objectives: "Identifying learning objectives",
   structure: "Organizing course modules",
   lessons: "Generating detailed lessons",

@@ -27,6 +27,10 @@ export const AiSettings = z.object({
   image_generation: z.boolean().catch(false),
 });
 
+export const PaymentSettings = z.object({
+  platform_fee_percent: z.number().min(0).max(90).catch(10),
+});
+
 export type CommunityLinks = { whatsappUrl: string | null; telegramUrl: string | null };
 
 const schemas = {
@@ -34,6 +38,7 @@ const schemas = {
   certificates: CertificateSettings,
   completion: CompletionSettings,
   ai: AiSettings,
+  payments: PaymentSettings,
 } as const;
 export type SettingKey = keyof typeof schemas;
 export type SettingValue<K extends SettingKey> = z.infer<(typeof schemas)[K]>;

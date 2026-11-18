@@ -30,6 +30,9 @@ import {
   SYSTEM_OVERVIEW,
   SYSTEM_QUALITY,
   SYSTEM_QUIZ,
+  FIDELITY_RULES,
+  PROMPT_MODE_RULES,
+  SYSTEM_PLAN_FROM_BRIEF,
 } from "@/lib/ai/prompts";
 import { generateConceptImage, imageProviderConfigured } from "@/lib/ai/images";
 import { getSetting } from "@/lib/settings";
@@ -111,6 +114,45 @@ async function getCourse(ctx: Ctx) {
   const { data, error } = await ctx.db.from("courses").select("*").eq("id", ctx.job.course_id).single();
   if (error || !data) throw new FatalJobError("Course no longer exists.");
   return data as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+type SourceKind = "youtube" | "video_upload" | "document" | "article" | "prompt";
+
+/** How prompts should refer to the course's source material. */
+function sourceInfo(course: Record<string, any>) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const kind = (course.source_type ?? "youtube") as SourceKind;
+  const title = course.original_video_title ?? course.title;
+  switch (kind) {
+    case "document":
+      return { kind, noun: "document", text: "document text", header: `Source: document "${title}"${course.source_name ? ` (file ${course.source_name})` : ""}` };
+    case "article":
+      return {
+        kind,
+        noun: "article",
+        text: "article text",
+        header: `Source: web article "${title}"${course.channel_name ? ` by ${course.channel_name}` : ""}${course.source_url ? ` (${course.source_url})` : ""}`,
+      };
+    case "video_upload":
+      return { kind, noun: "video", text: "transcript", header: `Source: uploaded recording "${title}"` };
+    case "prompt":
+      return { kind, noun: "syllabus", text: "course brief", header: `Course written from the creator's brief "${title}"` };
+    default:
+      return { kind, noun: "video", text: "transcript", header: `Video: "${title}" by ${course.channel_name ?? "unknown channel"}` };
+  }
+}
+
+/**
+ * Adapts a stage's prompt to the course's source. Prompt-generated courses have
+ * no source material, so the source-fidelity rules are swapped for accuracy
+ * rules. Applied by both engines right before a prompt is used.
+ */
+export async function adaptPromptForCourse(ctx: Ctx, prompt: Prompt): Promise<Prompt> {
+  const course = await getCourse(ctx);
+  if (course.source_type !== "prompt" || prompt.system === SYSTEM_PLAN_FROM_BRIEF) return prompt;
+  const system = prompt.system.includes(FIDELITY_RULES)
+    ? prompt.system.replace(FIDELITY_RULES, PROMPT_MODE_RULES)
+    : `${prompt.system}\n\n${PROMPT_MODE_RULES}`;
+  return { ...prompt, system };
 }
 
 async function loadSegments(ctx: Ctx): Promise<TranscriptSegment[]> {
@@ -391,6 +433,7 @@ async function generate<S extends import("zod").z.ZodType>(
   maxTokens: number,
   effort?: "low",
 ) {
+  prompt = await adaptPromptForCourse(ctx, prompt);
   const ai = await ctx.ai();
   const { data } = await ai.generateStructured({
     operation,
@@ -408,6 +451,10 @@ async function generate<S extends import("zod").z.ZodType>(
 
 export async function taskMetadata(ctx: Ctx): Promise<TaskOutcome> {
   const course = await getCourse(ctx);
+  // Uploads, documents and articles: details were captured when the course was created.
+  if ((course.source_type ?? "youtube") !== "youtube") {
+    return { status: "completed", result: { metadata: null, source: course.source_type } };
+  }
   const meta = await fetchVideoMetadata(course.youtube_video_id, Boolean(ctx.job.input.isShort));
   await ctx.db
     .from("courses")
@@ -448,26 +495,31 @@ export async function taskTranscript(task: TaskRow, ctx: Ctx): Promise<TaskOutco
   let hasTimestamps = true;
   let lang: string | null = null;
 
-  if (source === "manual") {
+  if (source === "manual" || source === "document" || source === "article" || source === "prompt") {
     // Already stored when the job was created.
     segments = await loadSegments(ctx);
-    hasTimestamps = ctx.job.input.manualHasTimestamps !== false;
-    if (!segments.length) throw new FatalJobError("The uploaded transcript is empty.");
+    hasTimestamps = source === "manual" && ctx.job.input.manualHasTimestamps !== false;
+    if (!segments.length) throw new FatalJobError(source === "manual" ? "The uploaded transcript is empty." : "The source text is empty.");
   } else {
     const prev = (task.result ?? {}) as { providerJobId?: string };
     let mediaUrl: string | undefined;
     if (source === "media_upload") {
       const path = ctx.job.input.mediaPath as string | undefined;
-      if (!path) throw new FatalJobError("No media file was uploaded for transcription.");
-      const { data, error } = await ctx.db.storage.from("uploads").createSignedUrl(path, 60 * 60 * 6);
-      if (error || !data) throw new FatalJobError("Could not access the uploaded media file.");
-      mediaUrl = data.signedUrl;
+      const directUrl = ctx.job.input.mediaUrl as string | undefined;
+      if (directUrl) {
+        mediaUrl = directUrl; // public media link (e.g. supplied through the MCP connector)
+      } else {
+        if (!path) throw new FatalJobError("No media file was uploaded for transcription.");
+        const { data, error } = await ctx.db.storage.from("uploads").createSignedUrl(path, 60 * 60 * 6);
+        if (error || !data) throw new FatalJobError("Could not access the uploaded media file.");
+        mediaUrl = data.signedUrl;
+      }
     }
     const res = prev.providerJobId
       ? await pollTranscriptJob(prev.providerJobId)
       : await requestTranscript({
           source,
-          videoUrl: canonicalWatchUrl(course.youtube_video_id),
+          videoUrl: course.youtube_video_id ? canonicalWatchUrl(course.youtube_video_id) : undefined,
           mediaUrl,
           lang: (ctx.job.input.lang as string | undefined) || undefined,
         });
@@ -493,7 +545,8 @@ export async function taskTranscript(task: TaskRow, ctx: Ctx): Promise<TaskOutco
   const duration = Number(course.video_duration) || null;
   const coverageRatio = hasTimestamps && duration ? Math.min(1, lastEnd / duration) : null;
   const warnings: string[] = [];
-  if (!hasTimestamps) warnings.push("The transcript has no timestamps, so lessons cannot link to exact moments in the video.");
+  const isText = source === "document" || source === "article" || source === "prompt";
+  if (!hasTimestamps && !isText) warnings.push("The transcript has no timestamps, so lessons cannot link to exact moments in the video.");
   if (coverageRatio != null && coverageRatio < 0.9) {
     warnings.push(
       `The transcript only covers about ${Math.round(coverageRatio * 100)}% of the video's length. Parts of the video without speech or captions were not analysed.`,
@@ -512,7 +565,7 @@ export async function taskTranscript(task: TaskRow, ctx: Ctx): Promise<TaskOutco
         video_seconds: duration,
         coverage_ratio: coverageRatio,
         has_timestamps: hasTimestamps,
-        visual_analysis: "transcript_only",
+        visual_analysis: source === "prompt" ? "prompt" : isText ? "text_source" : "transcript_only",
       },
     })
     .eq("id", course.id);
@@ -529,10 +582,22 @@ export async function buildChunkPrompt(ctx: Ctx, index: number): Promise<Prompt>
   const cs = await chunks(ctx);
   const chunk = cs[index];
   if (!chunk) throw new FatalJobError(`Transcript chunk ${index} missing`);
+  if (course.source_type === "prompt") {
+    // No source to extract from: plan the whole syllabus from the creator's brief.
+    const brief = cs.map((c) => c.text).join("\n\n");
+    return {
+      system: SYSTEM_PLAN_FROM_BRIEF,
+      content: text(`Plan the complete syllabus for this course.
+
+<course_brief>
+${brief}
+</course_brief>`),
+    };
+  }
   return {
     system: SYSTEM_ANALYZE_CHUNK,
-    content: text(`Video: "${course.original_video_title ?? course.title}" by ${course.channel_name ?? "unknown channel"}.
-This is window ${index + 1} of ${cs.length} of the full transcript${
+    content: text(`${sourceInfo(course).header}.
+This is window ${index + 1} of ${cs.length} of the full ${sourceInfo(course).text}${
       hasTs(ctx) ? ` (from ${Math.round(chunk.start)}s to ${Math.round(chunk.end)}s)` : ""
     }. Earlier and later windows are analysed separately — extract every teaching point in THIS window.
 
@@ -597,15 +662,16 @@ export async function buildOverviewPrompt(ctx: Ctx): Promise<Prompt> {
   const course = await getCourse(ctx);
   ctx.memo.delete("inventory");
   const { points } = await loadInventory(ctx);
-  if (!points.length) throw new FatalJobError("No teaching content could be identified in this video's transcript.");
+  const src = sourceInfo(course);
+  if (!points.length) throw new FatalJobError(`No teaching content could be identified in this ${src.noun}.`);
   const frames = await frameNotes(ctx);
   return {
     system: SYSTEM_OVERVIEW,
-    content: text(`Video title: ${course.original_video_title}
-Channel: ${course.channel_name}
-Video description: ${(course.video_description ?? "n/a").slice(0, 3000)}
+    content: text(`${src.header}
+${src.kind === "youtube" ? "Channel" : "Author / site"}: ${course.channel_name ?? "n/a"}
+Description: ${(course.video_description ?? "n/a").slice(0, 3000)}
 
-Complete inventory of ${points.length} teaching points (in video order):
+Complete inventory of ${points.length} teaching points (in ${src.noun} order):
 ${points.map((p) => `${pointLine(p)} — ${p.detail.slice(0, 280)}`).join("\n")}
 ${frames.length ? `\nLearner-supplied frame analyses:\n${frames.join("\n")}` : ""}`),
   };
@@ -1176,6 +1242,11 @@ export async function taskFinalize(ctx: Ctx): Promise<TaskOutcome> {
   const warnings = new Set<string>([...((course.processing_warnings as string[]) ?? []), ...(ctx.job.state.warnings ?? [])]);
 
   const coverage = (course.coverage ?? {}) as Record<string, unknown>;
+  if (coverage.visual_analysis === "prompt") {
+    warnings.add(
+      "This course was written by AI from your brief rather than from source material. Review it for accuracy — especially figures, versions and recommendations — before sharing or selling it.",
+    );
+  }
   if (coverage.visual_analysis === "transcript_only") {
     warnings.add(
       "This course was generated from the video's transcript. On-screen visuals (slides, code on screen, UI clicks) were not analysed unless you added screenshots; lessons flag places where the video relies on visuals.",

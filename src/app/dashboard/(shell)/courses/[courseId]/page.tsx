@@ -8,6 +8,8 @@ import {
   BarChart3,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   ClipboardCheck,
   Clock,
   ExternalLink,
@@ -17,6 +19,7 @@ import {
   Layers,
   PlayCircle,
   ShieldCheck,
+  Sparkles,
   Target,
   Users,
 } from "lucide-react";
@@ -30,10 +33,19 @@ import { CommunityButtons } from "@/components/shared/community-buttons";
 import { CopyField } from "@/components/shared/copy-field";
 import { publicEnv } from "@/lib/env";
 import { Markdown } from "@/components/shared/markdown";
-import { CourseStatusBadge, ProgressBar, SectionCard } from "@/components/shared/ui-bits";
+import { CourseStatusBadge, FlowStep, ProgressBar, SectionCard, TONE_BG, type Tone } from "@/components/shared/ui-bits";
 import { buttonVariants } from "@/components/ui/button";
 import { YouTubeIcon } from "@/components/brand/brand-icons";
 import { cn } from "@/lib/utils";
+import { CourseLanding } from "@/components/course/course-landing";
+import { EnrollButton } from "@/components/course/enroll-button";
+import { SharePanel } from "@/components/course/share-panel";
+import { getCourseLanding, userHasCourseAccess } from "@/lib/data/marketplace";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getSetting } from "@/lib/settings";
+import { paystackConfigured } from "@/lib/payments/paystack";
+import { isCurrency } from "@/lib/money";
+import { SOURCE_TYPE_LABEL, sourceTypeOf } from "@/lib/sources/labels";
 
 export const metadata: Metadata = { title: "Course" };
 
@@ -59,15 +71,68 @@ const SOURCE_LABEL: Record<string, string> = {
   ai_transcription: "AI transcription of the audio",
   media_upload: "Transcription of uploaded recording",
   manual: "Uploaded transcript",
+  document: "Full text of the uploaded document",
+  article: "Main text of the web article",
+  prompt: "Creator's written brief (AI-planned syllabus)",
 };
 
-export default async function CoursePage({ params }: PageProps<"/dashboard/courses/[courseId]">) {
+function PaymentNotice({ status }: { status: string | undefined }) {
+  if (!status) return null;
+  const map: Record<string, { cls: string; text: string }> = {
+    success: { cls: "bg-tile-mint", text: "Payment received — welcome to the course! Your access is ready." },
+    pending: { cls: "bg-tile-butter", text: "We're confirming your payment with Paystack. This page will unlock as soon as it's verified — refresh in a moment." },
+    failed: { cls: "bg-destructive/10 text-destructive", text: "The payment wasn't completed, so you weren't charged for access. You can try again." },
+  };
+  const m = map[status];
+  if (!m) return null;
+  return <div className={cn("mb-6 rounded-2xl px-5 py-3.5 text-sm", m.cls)}>{m.text}</div>;
+}
+
+export default async function CoursePage({ params, searchParams }: PageProps<"/dashboard/courses/[courseId]">) {
   const { courseId } = await params;
+  const sp = await searchParams;
+  const paymentStatus = typeof sp.payment === "string" ? sp.payment : undefined;
   const user = await requireUser(`/dashboard/courses/${courseId}`);
   const outline = await getCourseOutline(courseId, user.id);
   if (!outline) notFound();
   const { course, modules, isOwner, latestJob } = outline;
+
+  // Someone else's course without access yet → sales page (outline only).
+  const hasAccess = await userHasCourseAccess(user.id, courseId, course.user_id, user.role === "admin");
+  if (!hasAccess) {
+    const landing = await getCourseLanding(courseId);
+    if (!landing) notFound();
+    return (
+      <div className="mx-auto max-w-6xl">
+        <nav aria-label="Breadcrumb" className="mb-6 flex min-w-0 items-center gap-2 text-[15px] text-muted-foreground">
+          <Link href="/dashboard/explore" className="shrink-0 hover:text-foreground">
+            Explore
+          </Link>
+          <ChevronRight className="size-4 shrink-0" />
+          <span className="truncate text-foreground">{course.title}</span>
+        </nav>
+        <CourseLanding
+          data={landing}
+          notice={<PaymentNotice status={paymentStatus} />}
+          action={<EnrollButton courseId={courseId} priceAmount={landing.course.price_amount} currency={landing.course.currency} signedIn />}
+        />
+      </div>
+    );
+  }
+
   const links = await getCachedCommunityLinks();
+  const sourceType = sourceTypeOf(course.source_type);
+  const isYouTube = sourceType === "youtube" && Boolean(course.youtube_video_id);
+  const isVideoSource = sourceType === "youtube" || sourceType === "video_upload";
+  const share = isOwner
+    ? await (async () => {
+        const [{ count }, payments] = await Promise.all([
+          createAdminClient().from("course_access").select("id", { count: "exact", head: true }).eq("course_id", courseId),
+          getSetting("payments"),
+        ]);
+        return { learners: count ?? 0, feePercent: payments.platform_fee_percent };
+      })()
+    : null;
 
   const generating = latestJob && ["queued", "running", "waiting"].includes(latestJob.status);
   const isMainJob = latestJob?.job_type === "generate_course" || latestJob?.job_type === "assistant_generate";
@@ -100,7 +165,7 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
           </div>
         </div>
         {generating && assistantJob && (
-          <div className="mb-6 rounded-2xl border border-primary/30 bg-accent/40 p-6">
+          <div className="mb-6 rounded-3xl bg-tile-peach p-6">
             <h2 className="flex items-center gap-2 font-semibold">
               <Plug className="size-4 text-primary" /> Your AI assistant is writing this course
             </h2>
@@ -135,67 +200,111 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
 
   return (
     <div className="mx-auto max-w-6xl">
+      <PaymentNotice status={paymentStatus} />
+      <nav aria-label="Breadcrumb" className="mb-6 flex min-w-0 items-center gap-2 text-[15px] text-muted-foreground">
+        <Link href="/dashboard/courses" className="shrink-0 hover:text-foreground">
+          My Courses
+        </Link>
+        <ChevronRight className="size-4 shrink-0" />
+        <span className="truncate text-foreground">{course.title}</span>
+      </nav>
       {/* Header */}
       <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CourseStatusBadge status={course.status} />
             {course.difficulty && (
-              <span className="rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize">{course.difficulty}</span>
+              <span className="rounded-full bg-tile-sky px-2.5 py-1 text-[11px] font-medium capitalize">{course.difficulty}</span>
             )}
             {course.is_public && (
-              <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 rounded-full bg-tile-butter px-2.5 py-1 text-[11px] font-medium">
                 <Globe className="size-3" /> Public
               </span>
             )}
           </div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance">{course.title}</h1>
+          <h1 className="mt-4 text-3xl leading-tight font-medium tracking-tight text-balance sm:text-4xl">{course.title}</h1>
           {course.subtitle && <p className="mt-2 text-lg text-muted-foreground">{course.subtitle}</p>}
-          <a
-            href={course.youtube_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <YouTubeIcon className="size-4 text-[#FF0000]" />
-            {course.original_video_title} · {course.channel_name}
-            <ExternalLink className="size-3.5" />
-          </a>
+          {isYouTube ? (
+            <a
+              href={course.youtube_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <YouTubeIcon className="size-4 text-[#FF0000]" />
+              {course.original_video_title} · {course.channel_name}
+              <ExternalLink className="size-3.5" />
+            </a>
+          ) : sourceType === "article" && course.source_url ? (
+            <a
+              href={course.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <Globe className="size-4 text-primary" />
+              {course.original_video_title ?? "Source article"}
+              {course.source_name ? ` · ${course.source_name}` : ""}
+              <ExternalLink className="size-3.5" />
+            </a>
+          ) : (
+            <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <FileText className="size-4 text-primary" />
+              {SOURCE_TYPE_LABEL[sourceType]}
+              {course.source_name ? ` · ${course.source_name}` : ""}
+            </p>
+          )}
 
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { icon: Layers, label: "Modules", value: modules.length },
-              { icon: BookOpen, label: "Lessons", value: outline.lessons.length },
-              { icon: Clock, label: "Est. time", value: course.estimated_duration ? formatDuration(course.estimated_duration * 60) : "—" },
-              { icon: PlayCircle, label: "Source video", value: formatDuration(course.video_duration) },
+              { icon: Layers, label: "Modules", value: modules.length, tone: "sky" as Tone },
+              { icon: BookOpen, label: "Lessons", value: outline.lessons.length, tone: "mint" as Tone },
+              { icon: Clock, label: "Est. time", value: course.estimated_duration ? formatDuration(course.estimated_duration * 60) : "—", tone: "lilac" as Tone },
+              {
+                icon: sourceType === "document" ? FileText : sourceType === "article" ? Globe : sourceType === "prompt" ? Sparkles : PlayCircle,
+                label: isVideoSource ? "Source video" : "Source",
+                value: isVideoSource ? formatDuration(course.video_duration) : SOURCE_TYPE_LABEL[sourceType],
+                tone: "butter" as Tone,
+              },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl border bg-card p-3 shadow-xs">
-                <s.icon className="size-4 text-primary" />
-                <p className="mt-2 text-sm font-semibold">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+              <div key={s.label} className={cn("rounded-2xl p-4", TONE_BG[s.tone])}>
+                <s.icon className="size-4 text-foreground/70" />
+                <p className="mt-3 text-lg leading-tight font-medium">{s.value}</p>
+                <p className="mt-0.5 text-xs text-foreground/60">{s.label}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* Progress card */}
-        <aside className="rounded-2xl border bg-card p-5 shadow-sm lg:sticky lg:top-6 lg:self-start">
+        <aside className="rounded-3xl border bg-card p-3 lg:sticky lg:top-6 lg:self-start">
           {course.thumbnail_url && (
-            <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">
-              <Image src={course.thumbnail_url} alt="" fill sizes="360px" className="object-cover" priority />
-            </div>
+            <Link
+              href={`/dashboard/courses/${course.id}/learn${resumeLessonId ? `?lesson=${resumeLessonId}` : ""}`}
+              className="group relative block aspect-video overflow-hidden rounded-2xl bg-muted"
+              aria-label="Open course player"
+            >
+              <Image src={course.thumbnail_url} alt="" fill sizes="360px" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" priority />
+              <span className="absolute inset-0 flex items-center justify-center">
+                <span className="flex size-14 items-center justify-center rounded-2xl bg-ink/85 text-ink-foreground ring-4 ring-ink-foreground/20 backdrop-blur-sm transition-transform group-hover:scale-105">
+                  <PlayCircle className="size-6" />
+                </span>
+              </span>
+            </Link>
           )}
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {outline.completedLessons}/{outline.totalLessons} lessons
+          <div className="px-2 pb-2">
+          <div className="mt-5 flex items-baseline justify-between">
+            <span className="text-lg font-medium">Your Progress</span>
+            <span className="text-muted-foreground tabular-nums">
+              {outline.completedLessons}/{outline.totalLessons}
             </span>
-            <span className="font-semibold tabular-nums">{outline.progress}%</span>
           </div>
-          <ProgressBar value={outline.progress} className="mt-2" />
+          <ProgressBar value={outline.progress} className="mt-3" />
+          <p className="mt-1.5 text-right text-xs text-muted-foreground tabular-nums">{outline.progress}% complete</p>
           <div className="mt-4 flex gap-2">
             <Link
               href={`/dashboard/courses/${course.id}/learn${resumeLessonId ? `?lesson=${resumeLessonId}` : ""}`}
-              className={cn(buttonVariants({ size: "lg" }), "h-10 flex-1")}
+              className={cn(buttonVariants({ size: "lg" }), "h-11 flex-1 text-[15px]")}
             >
               <PlayCircle />
               {outline.completedLessons > 0 ? "Continue Learning" : "Start Course"}
@@ -205,7 +314,7 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
           {outline.finalQuiz && (
             <Link
               href={`/dashboard/courses/${course.id}/learn?quiz=${outline.finalQuiz.id}`}
-              className="mt-3 flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors hover:bg-muted/50"
+              className="mt-3 flex items-center justify-between rounded-2xl border px-4 py-3 text-sm transition-colors hover:bg-muted/50"
             >
               <span className="flex items-center gap-2">
                 <ClipboardCheck className="size-4 text-primary" /> Final assessment
@@ -218,7 +327,7 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
           {outline.certificate ? (
             <Link
               href="/dashboard/certificates"
-              className="mt-3 flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2.5 text-sm font-medium text-success"
+              className="mt-3 flex items-center gap-2 rounded-2xl bg-tile-mint px-4 py-3 text-sm font-medium"
             >
               <Award className="size-4" /> Certificate earned — view
             </Link>
@@ -228,11 +337,12 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
               {outline.finalQuiz ? " and pass the final assessment" : ""} to earn your certificate.
             </p>
           )}
+          </div>
         </aside>
       </div>
 
       {generating && !isMainJob && latestJob && (
-        <div className="mt-6 rounded-xl border bg-card p-4 shadow-xs">
+        <div className="mt-6 rounded-3xl border bg-card p-5">
           <p className="mb-2 text-sm font-medium">
             {latestJob.job_type === "regenerate_lesson" ? "Regenerating a lesson" : "Regenerating illustrations"}
           </p>
@@ -243,7 +353,7 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
       {warnings.length > 0 && (
         <div className="mt-8 space-y-2">
           {warnings.map((w) => (
-            <div key={w} className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 text-sm">
+            <div key={w} className="flex items-start gap-3 rounded-2xl bg-tile-butter px-4 py-3 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
               <span>{w}</span>
             </div>
@@ -255,14 +365,14 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
         <div className="min-w-0 space-y-8">
           {course.description && (
             <section>
-              <h2 className="mb-3 text-lg font-semibold">About this course</h2>
+              <h2 className="mb-3 text-xl font-medium">About this course</h2>
               <Markdown>{course.description}</Markdown>
             </section>
           )}
 
           {objectives.length > 0 && (
-            <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <h2 className="flex items-center gap-2 text-base font-semibold">
+            <section className="rounded-3xl bg-tile-peach p-6">
+              <h2 className="flex items-center gap-2 text-lg font-medium">
                 <Target className="size-4 text-primary" /> What you&apos;ll learn
               </h2>
               <ul className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -276,84 +386,116 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
           )}
 
           <section>
-            <h2 className="mb-4 text-lg font-semibold">Curriculum</h2>
+            <div className="mb-4 flex items-baseline justify-between">
+              <h2 className="text-xl font-medium">Curriculum</h2>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {outline.completedLessons}/{outline.totalLessons} lessons
+              </span>
+            </div>
             <div className="space-y-3">
-              {modules.map((m, mi) => (
-                <details key={m.id} open={mi === 0} className="group overflow-hidden rounded-xl border bg-card shadow-xs">
-                  <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 marker:hidden">
-                    <span
-                      className={cn(
-                        "flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
-                        m.completed ? "bg-primary text-primary-foreground" : "bg-muted",
-                      )}
-                    >
-                      {m.completed ? <CheckCircle2 className="size-4" /> : mi + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium">{m.title}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {m.lessons.length} lessons
-                        {m.quiz ? " · quiz" : ""}
+              {modules.map((m, mi) => {
+                const rows = m.lessons.length + (m.quiz ? 1 : 0);
+                return (
+                  <details key={m.id} open={mi === 0} className="group overflow-hidden rounded-3xl border bg-card">
+                    <summary className="flex cursor-pointer list-none items-center gap-3.5 px-5 py-4 marker:hidden [&::-webkit-details-marker]:hidden">
+                      <span
+                        className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-medium",
+                          m.completed ? "bg-primary text-primary-foreground" : "bg-muted",
+                        )}
+                      >
+                        {m.completed ? <CheckCircle2 className="size-4" /> : String(mi + 1).padStart(2, "0")}
                       </span>
-                    </span>
-                  </summary>
-                  <div className="border-t">
-                    {m.description && <p className="px-5 pt-3 text-sm text-muted-foreground">{m.description}</p>}
-                    <ul className="divide-y">
-                      {m.lessons.map((l, li) => (
-                        <li key={l.id} className="flex items-center gap-3 px-5 py-3">
-                          {l.completed ? (
-                            <CheckCircle2 className="size-4 shrink-0 text-primary" />
-                          ) : (
-                            <FileText className="size-4 shrink-0 text-muted-foreground" />
-                          )}
-                          <Link
-                            href={`/dashboard/courses/${course.id}/learn?lesson=${l.id}`}
-                            className="min-w-0 flex-1 truncate text-sm hover:text-primary"
-                          >
-                            {mi + 1}.{li + 1} {l.title}
-                          </Link>
-                          {l.generation_status === "failed" && (
-                            <span className="text-[11px] font-medium text-destructive">Generation failed</span>
-                          )}
-                          {(l.quality_flags as unknown[])?.length > 0 && l.generation_status !== "failed" && (
-                            <AlertTriangle className="size-3.5 text-warning" aria-label="Has review notes" />
-                          )}
-                          {l.original_timestamp_start != null && coverage.has_timestamps !== false && (
-                            <a
-                              href={timestampUrl(course.youtube_video_id, l.original_timestamp_start)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="hidden text-xs tabular-nums text-muted-foreground hover:text-foreground sm:inline"
-                            >
-                              {formatTimestamp(l.original_timestamp_start)}
-                            </a>
-                          )}
-                          {l.estimated_reading_time ? (
-                            <span className="hidden text-xs text-muted-foreground sm:inline">{l.estimated_reading_time} min</span>
-                          ) : null}
-                        </li>
-                      ))}
-                      {m.quiz && (
-                        <li className="flex items-center gap-3 bg-muted/30 px-5 py-3">
-                          <ClipboardCheck className={cn("size-4", m.quiz.passed ? "text-primary" : "text-muted-foreground")} />
-                          <Link href={`/dashboard/courses/${course.id}/learn?quiz=${m.quiz.id}`} className="flex-1 text-sm hover:text-primary">
-                            {m.quiz.title}
-                          </Link>
-                          <span className="text-xs text-muted-foreground">
-                            {m.quiz.attempts ? `Best ${Math.round(m.quiz.best)}%` : `Pass ${m.quiz.passing_score}%`}
-                          </span>
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                </details>
-              ))}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-medium">{m.title}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {m.lessons.filter((l) => l.completed).length}/{m.lessons.length} lessons
+                          {m.quiz ? " · quiz" : ""}
+                        </span>
+                      </span>
+                      <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="border-t pb-2">
+                      {m.description && <p className="px-5 pt-4 text-sm text-muted-foreground">{m.description}</p>}
+                      <ul className="pt-1">
+                        {m.lessons.map((l, li) => (
+                          <FlowStep key={l.id} done={l.completed} last={li === rows - 1} dotLeft={26} dotTop={13}>
+                            <div className="flex items-center gap-3 py-3.5 pr-5 pl-[64px]">
+                              <Link
+                                href={`/dashboard/courses/${course.id}/learn?lesson=${l.id}`}
+                                className={cn(
+                                  "min-w-0 flex-1 truncate text-sm hover:text-primary",
+                                  l.completed ? "font-medium" : "text-foreground/80",
+                                )}
+                              >
+                                <span className="mr-1.5 text-muted-foreground tabular-nums">
+                                  {mi + 1}.{li + 1}
+                                </span>
+                                {l.title}
+                              </Link>
+                              {l.generation_status === "failed" && (
+                                <span className="text-[11px] font-medium text-destructive">Generation failed</span>
+                              )}
+                              {(l.quality_flags as unknown[])?.length > 0 && l.generation_status !== "failed" && (
+                                <AlertTriangle className="size-3.5 text-warning" aria-label="Has review notes" />
+                              )}
+                              {isYouTube && l.original_timestamp_start != null && coverage.has_timestamps !== false && (
+                                <a
+                                  href={timestampUrl(course.youtube_video_id, l.original_timestamp_start)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hidden rounded-full bg-muted px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground hover:text-foreground sm:inline"
+                                >
+                                  {formatTimestamp(l.original_timestamp_start)}
+                                </a>
+                              )}
+                              {l.estimated_reading_time ? (
+                                <span className="hidden text-xs text-muted-foreground sm:inline">{l.estimated_reading_time} min</span>
+                              ) : null}
+                            </div>
+                          </FlowStep>
+                        ))}
+                        {m.quiz && (
+                          <FlowStep done={!!m.quiz.passed} last dotLeft={26} dotTop={13}>
+                            <div className="flex items-center gap-3 py-3.5 pr-5 pl-[64px]">
+                              <ClipboardCheck className="size-4 shrink-0 text-primary" />
+                              <Link
+                                href={`/dashboard/courses/${course.id}/learn?quiz=${m.quiz.id}`}
+                                className="flex-1 text-sm font-medium hover:text-primary"
+                              >
+                                {m.quiz.title}
+                              </Link>
+                              <span className="rounded-full bg-tile-lilac px-2.5 py-0.5 text-[11px]">
+                                {m.quiz.attempts ? `Best ${Math.round(m.quiz.best)}%` : `Pass ${m.quiz.passing_score}%`}
+                              </span>
+                            </div>
+                          </FlowStep>
+                        )}
+                      </ul>
+                    </div>
+                  </details>
+                );
+              })}
             </div>
           </section>
         </div>
 
         <div className="space-y-6">
+          {isOwner && share && (
+            <SharePanel
+              courseId={course.id}
+              shareUrl={`${publicEnv.siteUrl}/courses/${course.id}`}
+              initial={{
+                isPublic: course.is_public,
+                priceAmount: course.price_amount ?? 0,
+                currency: isCurrency(course.currency) ? course.currency : "NGN",
+              }}
+              canShare={ready}
+              paymentsEnabled={paystackConfigured()}
+              feePercent={share.feePercent}
+              learners={share.learners}
+            />
+          )}
           {(prerequisites.length > 0 || course.target_audience) && (
             <SectionCard title="Before you start">
               {course.target_audience && (
@@ -388,13 +530,27 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
                 <dd className="text-right">{SOURCE_LABEL[coverage.transcript_source ?? ""] ?? "Transcript"}</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Transcript coverage</dt>
-                <dd>{coverage.coverage_ratio != null ? `${Math.round(coverage.coverage_ratio * 100)}% of video` : "Unknown duration"}</dd>
+                <dt className="text-muted-foreground">Content coverage</dt>
+                <dd>
+                  {coverage.visual_analysis === "prompt"
+                    ? "Planned from your brief"
+                    : coverage.visual_analysis === "text_source"
+                    ? "Full text"
+                    : coverage.coverage_ratio != null
+                      ? `${Math.round(coverage.coverage_ratio * 100)}% of video`
+                      : "Unknown duration"}
+                </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">On-screen visuals</dt>
                 <dd className="text-right">
-                  {coverage.visual_analysis === "transcript_and_user_frames" ? "Your screenshots analysed" : "Not analysed (transcript only)"}
+                  {coverage.visual_analysis === "transcript_and_user_frames"
+                    ? "Your screenshots analysed"
+                    : coverage.visual_analysis === "text_source"
+                      ? "Text source (images not analysed)"
+                      : coverage.visual_analysis === "prompt"
+                        ? "Not applicable"
+                      : "Not analysed (transcript only)"}
                 </dd>
               </div>
               {report.teaching_points != null && (
@@ -439,7 +595,7 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
                       {report.uncovered.slice(0, 10).map((u) => (
                         <li key={u.id}>
                           {u.title}
-                          {u.start_seconds != null && (
+                          {isYouTube && u.start_seconds != null && (
                             <a
                               className="ml-1 text-primary"
                               target="_blank"
@@ -465,7 +621,7 @@ export default async function CoursePage({ params }: PageProps<"/dashboard/cours
           {isOwner && (
             <Link
               href={`/dashboard/courses/${course.id}/edit`}
-              className="flex items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm shadow-xs transition-colors hover:border-primary/40"
+              className="flex items-center gap-2 rounded-2xl border bg-card px-4 py-3.5 text-sm transition-colors hover:border-primary/40"
             >
               <BarChart3 className="size-4 text-primary" /> Edit course, lessons & completion rules
             </Link>

@@ -7,7 +7,6 @@ import {
   Bookmark,
   CheckCircle2,
   ChevronDown,
-  Circle,
   ClipboardCheck,
   GraduationCap,
   Menu,
@@ -16,7 +15,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ProgressBar } from "@/components/shared/ui-bits";
+import { FlowStep, ProgressBar } from "@/components/shared/ui-bits";
 import { cn } from "@/lib/utils";
 import { hrefFor, type PlayerLocation, type PlayerOutline } from "./player-nav";
 
@@ -79,65 +78,64 @@ function Outline({ outline, current, onNavigate }: { outline: PlayerOutline; cur
                 })
               }
               aria-expanded={open}
-              className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/60"
+              className="flex w-full items-start gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-sidebar-accent"
             >
               <span
                 className={cn(
-                  "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold",
+                  "flex size-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-medium",
                   m.completed ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
                 )}
               >
-                {m.completed ? <CheckCircle2 className="size-3.5" /> : mi + 1}
+                {m.completed ? <CheckCircle2 className="size-3.5" /> : String(mi + 1).padStart(2, "0")}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[13px] leading-5 font-medium">{m.title}</span>
+                <span className="block text-sm leading-5 font-medium">{m.title}</span>
                 <span className="block text-[11px] text-muted-foreground">
                   {done}/{m.lessons.length} complete
                 </span>
               </span>
-              <ChevronDown className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+              <ChevronDown className={cn("mt-1.5 size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
             </button>
             {open && (
-              <ul className="mt-0.5 mb-2 ml-[18px] space-y-0.5 border-l pl-2">
-                {m.lessons.map((l) => {
+              <ul className="mt-0.5 mb-2 ml-2">
+                {m.lessons.map((l, li) => {
                   const active = current.kind === "lesson" && current.id === l.id;
                   return (
-                    <li key={l.id}>
+                    <FlowStep key={l.id} done={l.completed} active={active} last={li === m.lessons.length - 1 && !m.quiz} dotLeft={4} dotTop={9}>
                       <Link
                         href={hrefFor(outline.courseId, { kind: "lesson", id: l.id })}
                         onClick={onNavigate}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "flex items-start gap-2 rounded-md px-2 py-1.5 text-[13px] leading-5 transition-colors",
-                          active ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                          "flex items-start gap-2 rounded-xl py-2.5 pr-2 pl-9 text-[13px] leading-5 transition-colors",
+                          active
+                            ? "bg-accent font-medium text-foreground"
+                            : l.completed
+                              ? "font-medium text-foreground hover:bg-sidebar-accent"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                         )}
                       >
-                        {l.completed ? (
-                          <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                        ) : (
-                          <Circle className={cn("mt-0.5 size-3.5 shrink-0", active ? "text-primary" : "text-muted-foreground/50")} />
-                        )}
                         <span className="flex-1">{l.title}</span>
                         {l.bookmarked && <Bookmark className="mt-0.5 size-3 shrink-0 fill-current text-primary" />}
                       </Link>
-                    </li>
+                    </FlowStep>
                   );
                 })}
                 {m.quiz && (
-                  <li>
+                  <FlowStep done={!!m.quiz.passed} active={current.kind === "quiz" && current.id === m.quiz.id} last dotLeft={4} dotTop={9}>
                     <Link
                       href={hrefFor(outline.courseId, { kind: "quiz", id: m.quiz.id })}
                       onClick={onNavigate}
                       className={cn(
-                        "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
+                        "flex items-center gap-2 rounded-xl py-2.5 pr-2 pl-9 text-[13px] leading-5 transition-colors",
                         current.kind === "quiz" && current.id === m.quiz.id
-                          ? "bg-accent font-medium text-accent-foreground"
-                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                          ? "bg-accent font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                       )}
                     >
-                      <ClipboardCheck className={cn("size-3.5", m.quiz.passed ? "text-primary" : "")} /> Module quiz
+                      <ClipboardCheck className="size-3.5 text-primary" /> Module quiz
                     </Link>
-                  </li>
+                  </FlowStep>
                 )}
               </ul>
             )}
@@ -149,8 +147,8 @@ function Outline({ outline, current, onNavigate }: { outline: PlayerOutline; cur
           href={hrefFor(outline.courseId, { kind: "quiz", id: outline.finalQuiz.id })}
           onClick={onNavigate}
           className={cn(
-            "mt-2 flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-[13px] font-medium transition-colors",
-            current.kind === "quiz" && current.id === outline.finalQuiz.id ? "border-primary bg-accent" : "hover:bg-muted/60",
+            "mt-3 flex items-center gap-2.5 rounded-2xl border bg-card px-3.5 py-3 text-[13px] font-medium transition-colors",
+            current.kind === "quiz" && current.id === outline.finalQuiz.id ? "border-primary bg-accent" : "hover:bg-sidebar-accent",
           )}
         >
           <GraduationCap className={cn("size-4", outline.finalQuiz.passed ? "text-primary" : "text-muted-foreground")} />
@@ -164,17 +162,19 @@ function Outline({ outline, current, onNavigate }: { outline: PlayerOutline; cur
 
 function SidebarHeader({ outline }: { outline: PlayerOutline }) {
   return (
-    <div className="border-b px-4 pt-4 pb-4">
-      <Link href={`/dashboard/courses/${outline.courseId}`} className="line-clamp-2 text-sm font-semibold hover:text-primary">
+    <div className="border-b px-5 pt-5 pb-5">
+      <Link href={`/dashboard/courses/${outline.courseId}`} className="line-clamp-2 text-[15px] leading-snug font-medium hover:text-primary">
         {outline.courseTitle}
       </Link>
-      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          {outline.completedLessons}/{outline.totalLessons} lessons
-        </span>
-        <span className="font-medium text-foreground tabular-nums">{outline.progress}%</span>
+      <div className="mt-4 rounded-2xl bg-sidebar-accent p-3.5">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-medium">Your Progress</span>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {outline.completedLessons}/{outline.totalLessons}
+          </span>
+        </div>
+        <ProgressBar value={outline.progress} size="sm" className="mt-2.5" />
       </div>
-      <ProgressBar value={outline.progress} size="sm" className="mt-1.5" />
     </div>
   );
 }
@@ -239,7 +239,7 @@ export function PlayerShell({
       </Sheet>
 
       <div className={cn("transition-[padding] duration-200", !collapsed && "lg:pl-80")}>
-        <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
+        <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur-md">
           <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open course outline">
               <Menu className="size-5" />

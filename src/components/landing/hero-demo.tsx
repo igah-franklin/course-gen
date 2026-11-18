@@ -80,7 +80,7 @@ export function HeroDemo() {
 
   return (
     <div className="relative mx-auto w-full max-w-5xl">
-      <div className="absolute -inset-x-10 -top-10 -bottom-10 -z-10 rounded-[3rem] bg-[radial-gradient(ellipse_at_top,oklch(0.93_0.05_277/.7),transparent_65%)]" />
+      <div className="absolute -inset-x-10 -top-10 -bottom-10 -z-10 rounded-[3rem] bg-[radial-gradient(ellipse_at_top,oklch(0.93_0.05_35/.7),transparent_65%)]" />
       <div className="overflow-hidden rounded-2xl border bg-card shadow-2xl shadow-primary/10 ring-1 ring-black/[0.03]">
         {/* window chrome */}
         <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5">

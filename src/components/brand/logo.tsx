@@ -6,7 +6,7 @@ export function LogoMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "relative inline-flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/30",
+        "relative inline-flex size-8 items-center justify-center rounded-[10px] bg-primary text-primary-foreground shadow-sm shadow-primary/30",
         className,
       )}
       aria-hidden
@@ -24,7 +24,10 @@ export function Logo({ href = "/", className }: { href?: string; className?: str
   return (
     <Link href={href} className={cn("inline-flex items-center gap-2.5 font-semibold tracking-tight", className)}>
       <LogoMark />
-      <span className="text-[15px]">{publicEnv.appName}</span>
+      <span className="text-lg">
+        {publicEnv.appName}
+        <span className="text-primary">.</span>
+      </span>
     </Link>
   );
 }

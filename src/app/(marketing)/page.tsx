@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PrimaryCta } from "@/components/landing/auth-actions";
 import {
   Award,
   BarChart3,
@@ -59,8 +60,8 @@ export default function LandingPage() {
     <>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,oklch(0.97_0.015_277),transparent_40%)]" />
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_1px_1px,oklch(0.85_0.01_264)_1px,transparent_0)] [background-size:24px_24px] [mask-image:linear-gradient(to_bottom,black,transparent_55%)] opacity-60" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,oklch(0.96_0.025_40),transparent_40%)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_1px_1px,oklch(0.85_0.015_70)_1px,transparent_0)] [background-size:24px_24px] [mask-image:linear-gradient(to_bottom,black,transparent_55%)] opacity-60" />
         <div className="mx-auto max-w-6xl px-4 pt-16 pb-20 sm:px-6 md:pt-24">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center gap-2 rounded-full border bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs">
@@ -74,9 +75,7 @@ export default function LandingPage() {
               explanations, practical exercises, and complete learning experiences — powered by AI.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/signup" className={cn(buttonVariants({ size: "lg" }), "h-12 rounded-xl px-6 text-[15px] shadow-lg shadow-primary/25")}>
-                Create Your First Course
-              </Link>
+              <PrimaryCta signedOutLabel="Create Your First Course" className="h-12 rounded-xl px-6 text-[15px] shadow-lg shadow-primary/25" />
               <Link href="#how-it-works" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "h-12 rounded-xl px-6 text-[15px]")}>
                 Explore How It Works
               </Link>
@@ -214,9 +213,7 @@ export default function LandingPage() {
           <p className="mt-4 text-muted-foreground">
             Paste a YouTube URL and get a structured course with lessons, illustrations, quizzes and a certificate.
           </p>
-          <Link href="/signup" className={cn(buttonVariants({ size: "lg" }), "mt-8 h-12 rounded-xl px-6 text-[15px]")}>
-            Create Your First Course
-          </Link>
+          <PrimaryCta signedOutLabel="Create Your First Course" className="mt-8 h-12 rounded-xl px-6 text-[15px]" />
         </div>
       </section>
     </>

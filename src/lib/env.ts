@@ -47,6 +47,9 @@ export const serverEnv = {
     const v = Number(process.env.JOB_SLICE_SECONDS ?? 240);
     return Number.isFinite(v) && v > 10 ? v : 240;
   },
+  get paystackSecretKey() {
+    return process.env.PAYSTACK_SECRET_KEY ?? "";
+  },
   get adminEmails() {
     return (process.env.ADMIN_EMAILS ?? "")
       .split(",")
@@ -81,7 +84,7 @@ export function integrationStatus(): IntegrationStatus[] {
       configured: Boolean(serverEnv.anthropicApiKey),
       required: true,
       envVars: ["ANTHROPIC_API_KEY"],
-      purpose: "Video analysis, course, lesson, illustration and quiz generation",
+      purpose: "Source analysis, course, lesson, illustration and quiz generation",
     },
     {
       key: "supadata",
@@ -98,6 +101,14 @@ export function integrationStatus(): IntegrationStatus[] {
       required: false,
       envVars: ["YOUTUBE_API_KEY"],
       purpose: "Full video metadata (duration, description, caption availability)",
+    },
+    {
+      key: "paystack",
+      label: "Paystack payments",
+      configured: Boolean(serverEnv.paystackSecretKey),
+      required: false,
+      envVars: ["PAYSTACK_SECRET_KEY"],
+      purpose: "Collects payments for paid courses (webhook: /api/payments/paystack/webhook)",
     },
     {
       key: "openai_images",

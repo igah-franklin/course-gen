@@ -4,6 +4,7 @@ import { getSetting } from "@/lib/settings";
 import { publicEnv } from "@/lib/env";
 import { MODEL_PRICING } from "@/lib/ai/pricing";
 import { imageProviderConfigured } from "@/lib/ai/images";
+import { paystackConfigured } from "@/lib/payments/paystack";
 import { AdminSettingsForm } from "@/components/admin/settings-form";
 import { PageHeader } from "@/components/shared/ui-bits";
 
@@ -18,11 +19,12 @@ const MODEL_LABELS: Record<string, string> = {
 
 export default async function AdminSettingsPage() {
   await requireAdmin();
-  const [community, certificates, completion, ai] = await Promise.all([
+  const [community, certificates, completion, ai, payments] = await Promise.all([
     getSetting("community"),
     getSetting("certificates"),
     getSetting("completion"),
     getSetting("ai"),
+    getSetting("payments"),
   ]);
   return (
     <div className="mx-auto max-w-5xl">
@@ -33,6 +35,7 @@ export default async function AdminSettingsPage() {
           certificates,
           completion,
           ai,
+          payments,
         }}
         models={Object.keys(MODEL_PRICING).map((id) => {
           const p = MODEL_PRICING[id];
@@ -40,6 +43,7 @@ export default async function AdminSettingsPage() {
         })}
         envFallback={{ whatsapp: Boolean(publicEnv.whatsappUrl), telegram: Boolean(publicEnv.telegramUrl) }}
         imageProviderConfigured={imageProviderConfigured()}
+        paystackConfigured={paystackConfigured()}
       />
     </div>
   );

@@ -11,7 +11,7 @@ import type { CommunityLinks } from "@/lib/settings";
 import { claimCertificateAction } from "@/lib/actions/certificates";
 import { cn } from "@/lib/utils";
 
-const CONFETTI_COLORS = ["#4f46e5", "#818cf8", "#22c55e", "#f59e0b", "#06b6d4", "#ec4899"];
+const CONFETTI_COLORS = ["#d0645a", "#f2a490", "#7cc79a", "#f3cf6b", "#9fcfe6", "#c9a6e0"];
 
 function Confetti() {
   const [pieces, setPieces] = useState<{ x: number; d: number; r: number; c: string; s: number; delay: number }[]>([]);

@@ -17,7 +17,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
         </p>
       </div>
       <div className="relative hidden overflow-hidden border-l bg-muted/40 lg:block">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,oklch(0.9_0.07_277/.8),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,oklch(0.9_0.06_35/.8),transparent_60%)]" />
         <div className="relative flex h-full flex-col justify-center px-16">
           <p className="text-sm font-medium text-primary">Learn from YouTube, properly</p>
           <h2 className="mt-3 max-w-md text-3xl font-semibold tracking-tight">
